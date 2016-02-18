@@ -3,9 +3,9 @@
 import os
 import unittest
 import yaml
-import tempfile
 
 from charmtools.get import parse_charm_id, download, setup_parser, main
+from charmtools.utils import tempdir
 from mock import patch, call, Mock, MagicMock
 
 from cStringIO import StringIO
@@ -38,17 +38,18 @@ class JujuCharmGetTest(unittest.TestCase):
     def test_download(self, mock_exists, mMr):
         c = Charm()
         mock_exists.side_effect = [False, True]
-        temp_dir = tempfile.TemporaryDirectory()
-        download(c, temp_dir.name)
-        mMr.assert_called_with(temp_dir.name, mr_compat=False)
+        with(tempdir(False)) as temp_dir:
+            download(c, temp_dir)
+            mMr.assert_called_with(temp_dir, mr_compat=False)
 
     @patch('os.listdir')
     @patch('os.path.exists')
     def test_download_dir_exists(self, mock_exists, mock_listdir):
-        c = Charm()
-        mock_exists.side_effect = [True]
-        mock_listdir.side_effect = [True]
-        self.assertRaises(ValueError, download, c, '/tmp')
+        with(tempdir(False)) as temp_dir:
+            c = Charm()
+            mock_exists.side_effect = [True]
+            mock_listdir.side_effect = [True]
+            self.assertRaises(ValueError, download, c, temp_dir)
 
     @patch('charmtools.get.Mr')
     @patch('os.path.exists')
@@ -56,9 +57,9 @@ class JujuCharmGetTest(unittest.TestCase):
     def test_download_create_dir(self, mock_makedirs, mock_exists, mMr):
         c = Charm()
         mock_exists.side_effect = [False, False]
-        temp_dir = tempfile.TemporaryDirectory()
-        download(c, temp_dir.name)
-        mock_makedirs.assert_called_with(temp_dir.name)
+        with(tempdir(False)) as temp_dir:
+            download(c, temp_dir)
+            mock_makedirs.assert_called_with(temp_dir)
 
     @patch('charmtools.get.parse_charm_id')
     @patch('charmtools.get.download')
@@ -67,10 +68,10 @@ class JujuCharmGetTest(unittest.TestCase):
         c = Charm()
         mock_stderr.side_effect = MagicMock
         mpci.side_effect = [c]
-        temp_dir = tempfile.TemporaryDirectory()
-        main(['precise/dummy-0', temp_dir.name])
-        m.assert_called_with(c, temp_dir.name)
-        mpci.assert_called_with('precise/dummy-0')
+        with(tempdir(False)) as temp_dir:
+            main(['precise/dummy-0', temp_dir])
+            mdownload.assert_called_with(c, temp_dir)
+            mpci.assert_called_with('precise/dummy-0')
 
     @patch('charmtools.get.parse_charm_id')
     @patch('sys.stderr')
@@ -79,10 +80,10 @@ class JujuCharmGetTest(unittest.TestCase):
         mock_stderr.side_effect = MagicMock
         mpci.side_effect = [None]
         mock_exit.side_effect = SystemExit
-        temp = tempfile.TemporaryDirectory()
-        self.assertRaises(SystemExit, main, ['precise/badcharm-0', temp.name])
-        mpci.assert_called_with('precise/badcharm-0')
-        mock_exit.assert_called_with(1)
+        with(tempdir(False)) as tmpdir:
+            self.assertRaises(SystemExit, main, ['precise/badcharm-0', tmpdir])
+            mpci.assert_called_with('precise/badcharm-0')
+            mock_exit.assert_called_with(1)
 
     @patch('charmtools.get.parse_charm_id')
     @patch('charmtools.get.download')
@@ -94,10 +95,10 @@ class JujuCharmGetTest(unittest.TestCase):
         mpci.side_effect = [c]
         mock_exit.side_effect = SystemExit
         mdownload.side_effect = Exception
-        tmp = tempfile.TemporaryDirectory()
-        self.assertRaises(SystemExit, main, ['precise/faildownload-0', tmp.name])
-        mpci.assert_called_with('precise/faildownload-0')
-        mock_exit.assert_called_with(1)
+        with(tempdir(False)) as tmp:
+            self.assertRaises(SystemExit, main, ['precise/faildownload-0', tmp])
+            mpci.assert_called_with('precise/faildownload-0')
+            mock_exit.assert_called_with(1)
 
     def test_setup_parser(self):
         import argparse
